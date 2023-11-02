@@ -16,6 +16,14 @@
 package com.example.racetracker
 
 import com.example.racetracker.ui.RaceParticipant
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Test
 
 class RaceParticipantTest {
     private val raceParticipant = RaceParticipant(
@@ -25,4 +33,46 @@ class RaceParticipantTest {
         initialProgress = 0,
         progressIncrement = 1
     )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun raceParticipant_RaceStarted_ProgressIncremented() = runTest {
+        testRaceParticipant(1, raceParticipant.progressDelayMillis)
+    }
+
+    @Test
+    fun raceParticipant_RaceFinished_ProgressUpdated() {
+        val maxProgress = raceParticipant.maxProgress
+        testRaceParticipant(maxProgress, raceParticipant.progressDelayMillis * maxProgress)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun testRaceParticipant(expectedProgress: Int, delayTimeMillis: Long) = runTest {
+        launch { raceParticipant.run() }
+        advanceTimeBy(delayTimeMillis)
+        runCurrent()
+        assertEquals(expectedProgress, raceParticipant.currentProgress)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun raceParticipant_RacePaused_ProgressUpdated() = runTest {
+        val expectedProgress = 5
+        val racerJob = launch { raceParticipant.run() }
+        advanceTimeBy(expectedProgress * raceParticipant.progressDelayMillis)
+        runCurrent()
+        racerJob.cancelAndJoin()
+        assertEquals(expectedProgress, raceParticipant.currentProgress)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun raceParticipant_IncorrectMaxProgress_ThrowsException() {
+        RaceParticipant(name = "Test", maxProgress = 0)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun raceParticipant_IncorrectProgressIncrement_ThrowsException() {
+        RaceParticipant(name = "Test", maxProgress = 0)
+    }
+
 }
